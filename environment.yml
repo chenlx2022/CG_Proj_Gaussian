@@ -1,20 +1,31 @@
-name: gaussian_splatting
+name: gaussian_splatting1
 channels:
   - pytorch
   - conda-forge
   - defaults
 dependencies:
-  - cudatoolkit=11.6
+  # - cudatoolkit=11.6
   - plyfile
   - python=3.7.13
   - pip=22.3.1
-  - pytorch=1.12.1
-  - torchaudio=0.12.1
-  - torchvision=0.13.1
+  # - pytorch=1.12.1
+  # - torchaudio=0.12.1
+  # - torchvision=0.13.1
   - tqdm
   - pip:
-    - submodules/diff-gaussian-rasterization
-    - submodules/simple-knn
-    - submodules/fused-ssim
+    # - submodules/diff-gaussian-rasterization
+    # - submodules/simple-knn
+    # - submodules/fused-ssim
     - opencv-python
     - joblib
+
+#step1: use environment.yml to create environment
+#conda env create -f environment.yml
+
+#step2: use pip to install torch, torchvision, torchaudio
+#pip install torch==1.12.1+cu116 torchvision==0.13.1+cu116 torchaudio==0.12.1 --extra-index-url https://download.pytorch.org/whl/cu116
+
+#step3: access to GPU
+
+#step4: install submodules manually with GPU
+# pip install {submodule_name} 
