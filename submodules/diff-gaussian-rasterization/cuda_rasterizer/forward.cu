@@ -467,45 +467,8 @@ __global__ void preprocessCUDA(int P, int D, int M,
 
 	conic_opacity[idx] = { conic.x, conic.y, conic.z, opacity * h_convolution_scaling };
 
-	// =====================================================
-	// CG Final Project Optimization: Dynamic Tile - Accurate tiles_touched
-	// 
-	// 精确计算实际会访问的 Tile 数量（考虑 tile_step）
-	// 这样前缀和会更准确，避免分配过多内存
-	// =====================================================
-	int tile_step = 1;
-	if (my_radius >= 16.0f)  // 与 compute_tile_step 保持一致
-	{
-		if (my_radius >= 64.0f)
-			tile_step = 4;
-		else
-			tile_step = 2;
-	}
 
-	if (tile_step > 1)
-	{
-		// 扩展边界（与 duplicateWithKeys 保持一致）
-		int overlap = tile_step / 2;
-		int ext_min_x = max(0, (int)rect_min.x - overlap);
-		int ext_min_y = max(0, (int)rect_min.y - overlap);
-		int ext_max_x = min((int)grid.x, (int)rect_max.x + overlap);
-		int ext_max_y = min((int)grid.y, (int)rect_max.y + overlap);
-		
-		// 计算实际采样的 Tile 数（考虑 step）
-		int tiles_x = 0, tiles_y = 0;
-		if (ext_max_x - ext_min_x > 0)
-			tiles_x = (ext_max_x - ext_min_x + tile_step - 1) / tile_step;
-		if (ext_max_y - ext_min_y > 0)
-			tiles_y = (ext_max_y - ext_min_y + tile_step - 1) / tile_step;
-		
-		tiles_touched[idx] = tiles_x * tiles_y;
-	}
-	else
-	{
-		// tile_step == 1: 使用简单计算
-		tiles_touched[idx] = (rect_max.y - rect_min.y) * (rect_max.x - rect_min.x);
-	}
-	// =====================================================
+	tiles_touched[idx] = (rect_max.y - rect_min.y) * (rect_max.x - rect_min.x);
 }
 
 // Main rasterization method. Collaboratively works on one tile per

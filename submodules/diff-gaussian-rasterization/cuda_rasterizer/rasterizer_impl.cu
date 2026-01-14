@@ -221,21 +221,12 @@ __global__ void checkFrustum(int P,
 	present[idx] = in_frustum(idx, orig_points, viewmatrix, projmatrix, false, p_view);
 }
 
-// =====================================================
-// CG Final Project Optimization: Dynamic Tile Granularity
-// 根据高斯半径动态选择 Tile 采样粒度
-// - 小高斯（< 1 Tile）：逐 Tile 检查（step=1）
-// - 中等高斯（2-4 Tiles）：跳 2 个 Tile（step=2）
-// - 大高斯（16+ Tiles）：跳 4 个 Tile（step=4）
-// 目的：减少大高斯的键数，降低排序开销
-// =====================================================
 __device__ __forceinline__
 int compute_tile_step(int radius_px)
 {
-    // BLOCK_X = 16，所以 16px = 1 个 Tile
-    if (radius_px < 16)      return 1;  // < 1 Tile：精细采样
-    else if (radius_px < 64) return 2;  // 2-4 Tiles：中等粒度
-    else                     return 4;  // > 16 Tiles：粗粒度
+    if (radius_px < 8)       return 1; // fine
+    else if (radius_px < 32) return 2; // medium
+    else                     return 4; // coarse
 }
 
 
@@ -275,28 +266,9 @@ __global__ void duplicateWithKeys(
 	uint2 rect_min, rect_max;
 	getRect(points_xy[idx], r, rect_min, rect_max, grid);
 
-	// =====================================================
-	// 启用动态 Tile 粒度
-	// =====================================================
-	int tile_step = compute_tile_step(r);
-	tile_step = max(1, tile_step);
-
-	// =====================================================
-	// Overlap 扩展（仅当 step > 1 时）
-	// 目的：确保边界附近的 Tile 不会被遗漏
-	// 
-	// 原理：当使用 step=2 时，只采样 (0,0), (2,2), (4,4) ...
-	// 如果高斯边界在 (1,1)，可能会错过它
-	// 解决：将边界向外扩展 overlap = step/2
-	// =====================================================
-	if (tile_step > 1)
-	{
-		int overlap = tile_step / 2;
-		rect_min.x = max(0, (int)rect_min.x - overlap);
-		rect_min.y = max(0, (int)rect_min.y - overlap);
-		rect_max.x = min((int)grid.x, (int)rect_max.x + overlap);
-		rect_max.y = min((int)grid.y, (int)rect_max.y + overlap);
-	}
+	// Semi-dynamic tile granularity
+	// int tile_step = compute_tile_step(r);
+	int tile_step = 1;
 
 	float2 mu = points_xy[idx];
 
@@ -305,19 +277,14 @@ __global__ void duplicateWithKeys(
 	{
 		for (int x = rect_min.x; x < rect_max.x; x += tile_step)
 		{
-			// =====================================================
 			// Tile-level early reject
-			// 当 tile_step > 1 时，使用稍宽松的阈值
-			// =====================================================
 			float tile_cx = (x + 0.5f) * BLOCK_X;
 			float tile_cy = (y + 0.5f) * BLOCK_Y;
 
 			float dx = fabsf(mu.x - tile_cx);
 			float dy = fabsf(mu.y - tile_cy);
 
-			// 动态调整拒绝阈值
-			float rejection_margin = (tile_step > 1) ? (BLOCK_X * 1.2f) : BLOCK_X;
-			if (dx > r + rejection_margin || dy > r + rejection_margin)
+			if (dx > r + BLOCK_X || dy > r + BLOCK_Y)
 				continue;
 
 			uint64_t key = y * grid.x + x;
